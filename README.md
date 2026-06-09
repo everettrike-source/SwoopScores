@@ -58,16 +58,12 @@ class-schedule.app.utah.edu
 
 ### Changing the school
 
-The University of Utah's RMP school ID is hardcoded near the top of `background.js`:
-
-```js
-const UOU_SCHOOL_ID = 'U2Nob29sLTE0MTQ='; // base64 of "School-1414"
-```
+The extension dynamically looks up the University of Utah's RMP school ID at runtime using a `NewSearchSchoolsQuery` and caches the result in `chrome.storage.local` (so the lookup only happens once per install).
 
 To use this extension for a different university:
-1. Find the school's RMP legacy ID by running a `NewSearchSchoolsQuery` against the RMP GraphQL endpoint (see [au5ton/docs RMP wiki](https://github.com/au5ton/docs/wiki/RateMyProfessors-(ratemyprofessors.com))).
-2. Encode it: `btoa("School-" + legacyId)`.
-3. Replace `UOU_SCHOOL_ID` and update the `matches` URL in `manifest.json`.
+1. In `background.js`, change the search text and state filter inside `getSchoolId()` to match your school.
+2. Clear the cached school ID by opening the extension's service worker console (`chrome://extensions` → Service Worker) and running: `chrome.storage.local.remove('swoop_school_id')`.
+3. Update the `matches` URL in `manifest.json` to target your school's registration site.
 
 ### DOM selectors
 

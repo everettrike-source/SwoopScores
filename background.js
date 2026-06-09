@@ -7,11 +7,25 @@ const RMP_GRAPHQL_URL = 'https://www.ratemyprofessors.com/graphql';
 // If requests start returning 401, inspect the RMP page source for REACT_APP_GRAPHQL_AUTH.
 const RMP_AUTH = 'dGVzdDp0ZXN0';
 
-// University of Utah — RMP legacy school ID 1414, base64-encoded as a GraphQL node ID.
-// To find another school's ID, run a NewSearchSchoolsQuery with the school name.
-const UOU_SCHOOL_ID = 'U2Nob29sLTE0MTQ=';
-
 // ─── GraphQL Queries ──────────────────────────────────────────────────────────
+
+const SEARCH_SCHOOLS_QUERY = `
+  query NewSearchSchoolsQuery($query: SchoolSearchQuery!) {
+    newSearch {
+      schools(query: $query) {
+        edges {
+          node {
+            id
+            legacyId
+            name
+            city
+            state
+          }
+        }
+      }
+    }
+  }
+`;
 
 const SEARCH_TEACHERS_QUERY = `
   query NewSearchTeachersQuery($query: TeacherSearchQuery!) {
@@ -91,9 +105,10 @@ async function rmpQuery(query, variables) {
 }
 
 async function searchProfessor(professorName) {
-  console.log(`[SwoopScores] Searching RMP for "${professorName}" at UofU…`);
+  const schoolId = await getSchoolId();
+  console.log(`[SwoopScores] Searching RMP for "${professorName}" at school ${schoolId}…`);
   const data = await rmpQuery(SEARCH_TEACHERS_QUERY, {
-    query: { schoolID: UOU_SCHOOL_ID, text: professorName },
+    query: { schoolID: schoolId, text: professorName },
   });
 
   const edges = data?.newSearch?.teachers?.edges ?? [];
@@ -120,6 +135,42 @@ async function getTeacherRatings(teacherId) {
   }
 
   return teacher;
+}
+
+// ─── School ID lookup ─────────────────────────────────────────────────────────
+// Dynamically resolves the University of Utah's RMP school ID and caches it in
+// chrome.storage.local (persistent across browser restarts). This avoids the
+// brittleness of a hardcoded ID that may be wrong or change over time.
+
+const SCHOOL_ID_CACHE_KEY = 'swoop_school_id';
+
+async function getSchoolId() {
+  const stored = await chrome.storage.local.get(SCHOOL_ID_CACHE_KEY);
+  if (stored[SCHOOL_ID_CACHE_KEY]) {
+    console.log(`[SwoopScores] Using cached school ID: ${stored[SCHOOL_ID_CACHE_KEY]}`);
+    return stored[SCHOOL_ID_CACHE_KEY];
+  }
+
+  console.log('[SwoopScores] Looking up University of Utah school ID from RMP…');
+  const data = await rmpQuery(SEARCH_SCHOOLS_QUERY, {
+    query: { text: 'University of Utah' },
+  });
+  const edges = data?.newSearch?.schools?.edges ?? [];
+
+  if (edges.length === 0) throw new Error('No schools returned from RMP school search');
+
+  // Prefer an exact name + state match; fall back to the first result.
+  const match =
+    edges.find((e) => e.node.state === 'UT' && e.node.name === 'University of Utah') ??
+    edges[0];
+
+  const schoolId = match.node.id;
+  console.log(
+    `[SwoopScores] Resolved school ID: ${schoolId} (legacyId: ${match.node.legacyId}, name: "${match.node.name}")`
+  );
+
+  await chrome.storage.local.set({ [SCHOOL_ID_CACHE_KEY]: schoolId });
+  return schoolId;
 }
 
 // ─── Session cache ────────────────────────────────────────────────────────────
