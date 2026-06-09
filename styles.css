@@ -15,7 +15,7 @@
 .swoop-badge {
   display: inline-block;
   margin-left: 5px;
-  padding: 1px 7px;
+  padding: 2px 8px;
   border-radius: 10px;
   font-size: 11px;
   font-weight: 700;
@@ -23,6 +23,7 @@
   vertical-align: middle;
   cursor: pointer;
   line-height: 1.6;
+  letter-spacing: 0.5px;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
   user-select: none;
   white-space: nowrap;
