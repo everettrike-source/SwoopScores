@@ -8,22 +8,67 @@
      Text     #333333
 */
 
-/* ─── Professor name highlight ─────────────────────────────────────────────── */
+/* ─── Score badge ───────────────────────────────────────────────────────────── */
+/* Inserted immediately after each professor name. Color reflects their RMP     */
+/* overall rating at a glance; click to open the full popup.                    */
 
-.swoop-prof-name {
+.swoop-badge {
+  display: inline-block;
+  margin-left: 5px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  vertical-align: middle;
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: #CC0000;
-  text-decoration-thickness: 1.5px;
-  text-underline-offset: 2px;
-  color: inherit;
-  border-radius: 2px;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  line-height: 1.6;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  user-select: none;
+  white-space: nowrap;
 }
 
-.swoop-prof-name:hover {
-  background-color: rgba(204, 0, 0, 0.08);
-  color: #8B0000;
+.swoop-badge:hover {
+  transform: scale(1.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+/* Loading — gray pill with pulsing opacity */
+.swoop-badge-loading {
+  background: #DDDDDD;
+  color: #888888;
+  animation: swoopPulse 1.2s ease-in-out infinite;
+  letter-spacing: 1px;
+}
+
+@keyframes swoopPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+/* Good (≥ 3.5) — green */
+.swoop-badge-good {
+  background: #1E8C3A;
+  color: #FFFFFF;
+}
+
+/* OK (2.5–3.49) — amber */
+.swoop-badge-ok {
+  background: #D4820A;
+  color: #FFFFFF;
+}
+
+/* Bad (< 2.5) — crimson */
+.swoop-badge-bad {
+  background: #CC0000;
+  color: #FFFFFF;
+}
+
+/* Unknown / not found on RMP */
+.swoop-badge-unknown {
+  background: #E8E8E8;
+  color: #999999;
+  border: 1px solid #CCCCCC;
 }
 
 /* ─── Popup card ────────────────────────────────────────────────────────────── */

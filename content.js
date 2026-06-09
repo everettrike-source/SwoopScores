@@ -1,6 +1,7 @@
 // SwoopScores — Content Script
 // Scans the DOM for professor names on class-schedule.app.utah.edu,
-// makes them clickable, and shows a RateMyProfessor popup on click.
+// inserts a color-coded RMP score badge after each name, and shows a
+// detailed popup when the badge is clicked.
 
 (function () {
   'use strict';
@@ -15,8 +16,6 @@
     '[data-instructor]',
     'td.instructor',
     'span.instructor',
-    // Generic fallback: table cells whose text looks like a professor name
-    // (handled separately via heuristic scan — see scanNode())
   ];
 
   const PROCESSED_ATTR = 'data-swoop-processed';
@@ -55,48 +54,106 @@
     return words.every((w) => /^[A-Z][a-zA-Z''-]+$/.test(w));
   }
 
-  // ─── DOM wrapping ────────────────────────────────────────────────────────────
+  // ─── Eager fetch queue ───────────────────────────────────────────────────────
+  // All professor badges are queued on detection. Fetches run staggered (200ms
+  // apart) so we don't hammer the RMP API when a page has many instructors.
 
-  // For <a> elements we apply the class + handler directly rather than replacing
-  // text nodes, so that we can call preventDefault() and block link navigation.
+  const fetchQueue = [];
+  let fetchTimerActive = false;
+
+  function queueEagerFetch(professorName, badgeEl) {
+    fetchQueue.push({ professorName, badgeEl });
+    if (!fetchTimerActive) {
+      fetchTimerActive = true;
+      // 600ms delay lets the initial DOM scan fully complete before we start
+      // firing network requests.
+      setTimeout(drainFetchQueue, 600);
+    }
+  }
+
+  async function drainFetchQueue() {
+    const items = fetchQueue.splice(0);
+    for (const { professorName, badgeEl } of items) {
+      // Fire-and-forget — badge updates itself when the response arrives.
+      fetchRMPForBadge(professorName, badgeEl);
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    fetchTimerActive = false;
+  }
+
+  async function fetchRMPForBadge(professorName, badgeEl) {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        action: 'fetchRMP',
+        professorName,
+      });
+
+      if (!badgeEl.isConnected) return; // element may have been removed
+
+      if (response.error) {
+        badgeEl.className = 'swoop-badge swoop-badge-unknown';
+        badgeEl.textContent = '?';
+        badgeEl.title = `Not found on RMP — click to try manually`;
+        console.log(`[SwoopScores] No RMP data for "${professorName}": ${response.error}`);
+      } else {
+        const colorKey = ratingColorKey(response.avgRating);
+        badgeEl.className = `swoop-badge swoop-badge-${colorKey}`;
+        badgeEl.textContent = Number(response.avgRating).toFixed(1);
+        badgeEl.title = `RMP: ${Number(response.avgRating).toFixed(1)} / 5 — click for details`;
+        console.log(
+          `[SwoopScores] Badge updated for "${professorName}": ${response.avgRating} (${colorKey})`
+        );
+      }
+    } catch (err) {
+      console.error(`[SwoopScores] fetchRMPForBadge error for "${professorName}":`, err);
+      if (badgeEl.isConnected) {
+        badgeEl.className = 'swoop-badge swoop-badge-unknown';
+        badgeEl.textContent = '!';
+        badgeEl.title = 'Extension error — check console';
+      }
+    }
+  }
+
+  // ─── Badge insertion ─────────────────────────────────────────────────────────
+
+  function insertBadge(professorName, afterEl) {
+    const badge = document.createElement('span');
+    badge.className = 'swoop-badge swoop-badge-loading';
+    badge.textContent = '···';
+    badge.title = 'Loading RMP score…';
+    badge.dataset.swoopName = professorName;
+
+    badge.addEventListener('click', (e) => {
+      e.stopPropagation();
+      handleProfessorClick(badge, professorName);
+    });
+
+    afterEl.insertAdjacentElement('afterend', badge);
+    queueEagerFetch(professorName, badge);
+    return badge;
+  }
+
+  // ─── DOM processing ──────────────────────────────────────────────────────────
+
+  // For <a> elements: leave the link intact, insert badge after it.
   function processAnchorElement(el) {
     if (el.hasAttribute(PROCESSED_ATTR)) return;
     const text = el.textContent.trim();
     if (!looksLikeName(text)) return;
-    const name = cleanName(text);
 
     el.setAttribute(PROCESSED_ATTR, 'true');
-    el.classList.add('swoop-prof-name');
-    el.title = 'Click to view RateMyProfessor score';
-
-    el.addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handleProfessorClick(el, name);
-    });
+    insertBadge(cleanName(text), el);
   }
 
-  function wrapNameNode(textNode, name) {
-    const span = document.createElement('span');
-    span.className = 'swoop-prof-name';
-    span.title = 'Click to view RateMyProfessor score';
-    span.textContent = textNode.textContent;
-
-    span.addEventListener('click', (e) => {
-      e.stopPropagation();
-      handleProfessorClick(span, name);
-    });
-
-    textNode.parentNode.replaceChild(span, textNode);
-  }
-
+  // For non-anchor elements (targeted selectors / td/span heuristic):
+  // insert a badge after the element itself.
   function processElement(el) {
     if (el.hasAttribute(PROCESSED_ATTR)) return;
     el.setAttribute(PROCESSED_ATTR, 'true');
 
-    // Walk text nodes inside the element looking for name-like text.
+    // Walk text nodes to find the name-like text.
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
-    const nodesToWrap = [];
+    let bestName = null;
 
     let node;
     while ((node = walker.nextNode())) {
@@ -104,14 +161,12 @@
       if (!text) continue;
       const name = cleanName(text);
       if (looksLikeName(name)) {
-        nodesToWrap.push({ node, name });
+        bestName = name;
+        break;
       }
     }
 
-    // Replace after walking to avoid modifying the tree during traversal.
-    for (const { node, name } of nodesToWrap) {
-      wrapNameNode(node, name);
-    }
+    if (bestName) insertBadge(bestName, el);
   }
 
   // ─── DOM scanning ────────────────────────────────────────────────────────────
@@ -126,7 +181,6 @@
     root
       .querySelectorAll(`td:not([${PROCESSED_ATTR}]), span:not([${PROCESSED_ATTR}])`)
       .forEach((el) => {
-        // Skip elements that already contain child elements (likely layout cells)
         if (el.children.length > 0) return;
         const text = el.textContent.trim();
         const name = cleanName(text);
@@ -137,11 +191,11 @@
 
     // 3. Scan <a> elements — instructor names on class-schedule.app.utah.edu are
     //    rendered as hyperlinks (e.g. <a href="...">Smith, Jenn</a>).
-    //    We handle these separately to preserve the element and use preventDefault.
+    //    Badges are inserted after the <a> so the link itself still works.
     root
       .querySelectorAll(`a:not([${PROCESSED_ATTR}])`)
       .forEach((el) => {
-        if (el.children.length > 0) return; // skip anchors wrapping icons/images
+        if (el.children.length > 0) return;
         processAnchorElement(el);
       });
   }
@@ -153,6 +207,8 @@
     for (const mutation of mutations) {
       for (const node of mutation.addedNodes) {
         if (node.nodeType === Node.ELEMENT_NODE) {
+          // Skip badge elements we inserted ourselves to avoid infinite loops.
+          if (node.classList?.contains('swoop-badge')) continue;
           scanNode(node);
         }
       }
@@ -180,7 +236,6 @@
     let top = rect.bottom + scrollY + 6;
     let left = rect.left + scrollX;
 
-    // Keep popup inside the viewport horizontally.
     const popupWidth = 260;
     const viewportWidth = document.documentElement.clientWidth;
     if (left + popupWidth > viewportWidth + scrollX) {
@@ -277,7 +332,6 @@
         professorName,
       });
 
-      // Popup may have been dismissed while awaiting.
       const currentPopup = document.getElementById(POPUP_ID);
       if (!currentPopup) return;
 
@@ -323,15 +377,20 @@
     return Number(value).toFixed(1);
   }
 
-  // Rating: ≥3.5 green, 2.5–3.49 yellow, <2.5 red
-  function ratingColorClass(value) {
-    if (value == null || value < 0) return 'swoop-neutral';
-    if (value >= 3.5) return 'swoop-good';
-    if (value >= 2.5) return 'swoop-ok';
-    return 'swoop-bad';
+  // Returns a short key used for both badge classes and popup color classes.
+  // Rating: ≥3.5 → good/green, 2.5–3.49 → ok/yellow, <2.5 → bad/red
+  function ratingColorKey(value) {
+    if (value == null || value < 0) return 'unknown';
+    if (value >= 3.5) return 'good';
+    if (value >= 2.5) return 'ok';
+    return 'bad';
   }
 
-  // Difficulty: ≤2.5 green (easy), 2.5–3.5 yellow, >3.5 red (hard)
+  function ratingColorClass(value) {
+    return `swoop-${ratingColorKey(value)}`;
+  }
+
+  // Difficulty: ≤2.5 → good/green (easy), 2.5–3.5 → ok/yellow, >3.5 → bad/red (hard)
   function difficultyColorClass(value) {
     if (value == null || value < 0) return 'swoop-neutral';
     if (value <= 2.5) return 'swoop-good';
