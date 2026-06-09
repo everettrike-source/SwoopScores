@@ -24,26 +24,57 @@
 
   // ─── Name normalization ──────────────────────────────────────────────────────
 
-  // Strips titles (Dr., Prof., etc.) and extra whitespace so the RMP search
-  // gets a clean "First Last" string.
+  // Strips titles (Dr., Prof., etc.), normalizes whitespace, and converts the
+  // "Last, First" format used by class-schedule.app.utah.edu into "First Last"
+  // so RMP search gets the most natural query string.
   function cleanName(raw) {
-    return raw
+    let name = raw
       .replace(/\b(Dr\.?|Prof\.?|Mr\.?|Mrs\.?|Ms\.?)\s*/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
+
+    // Flip "Last, First" → "First Last" (e.g. "Smith, Jenn" → "Jenn Smith")
+    const lastFirst = name.match(/^([A-Z][a-zA-Z''-]+),\s*(.+)$/);
+    if (lastFirst) name = `${lastFirst[2].trim()} ${lastFirst[1].trim()}`;
+
+    return name;
   }
 
-  // Heuristic: does this string look like a "First Last" name?
-  // Requires 2–4 words, each starting with a capital letter, no digits.
+  // Heuristic: does this string look like a person's name?
+  // Accepts both "First Last" and "Last, First" formats, 2–4 name parts, no digits.
   function looksLikeName(text) {
     const trimmed = text.trim();
-    if (/\d/.test(trimmed)) return false;
+    if (!trimmed || /\d/.test(trimmed)) return false;
+
+    // "Last, First" — e.g. "Smith, Jenn" or "O'Brien, Mary Jane"
+    if (/^[A-Z][a-zA-Z''-]+,\s*[A-Z][a-zA-Z'\s-]+$/.test(trimmed)) return true;
+
+    // "First [Middle] Last" — e.g. "John Smith" or "Mary Jane Watson"
     const words = trimmed.split(/\s+/);
     if (words.length < 2 || words.length > 4) return false;
-    return words.every((w) => /^[A-Z][a-zA-Z'-]+$/.test(w));
+    return words.every((w) => /^[A-Z][a-zA-Z''-]+$/.test(w));
   }
 
   // ─── DOM wrapping ────────────────────────────────────────────────────────────
+
+  // For <a> elements we apply the class + handler directly rather than replacing
+  // text nodes, so that we can call preventDefault() and block link navigation.
+  function processAnchorElement(el) {
+    if (el.hasAttribute(PROCESSED_ATTR)) return;
+    const text = el.textContent.trim();
+    if (!looksLikeName(text)) return;
+    const name = cleanName(text);
+
+    el.setAttribute(PROCESSED_ATTR, 'true');
+    el.classList.add('swoop-prof-name');
+    el.title = 'Click to view RateMyProfessor score';
+
+    el.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handleProfessorClick(el, name);
+    });
+  }
 
   function wrapNameNode(textNode, name) {
     const span = document.createElement('span');
@@ -91,7 +122,7 @@
       root.querySelectorAll(`${selector}:not([${PROCESSED_ATTR}])`).forEach(processElement);
     }
 
-    // 2. Heuristic fallback: scan all <td> and <span> elements for name-like text
+    // 2. Heuristic fallback: scan <td> and <span> leaf elements for name-like text
     root
       .querySelectorAll(`td:not([${PROCESSED_ATTR}]), span:not([${PROCESSED_ATTR}])`)
       .forEach((el) => {
@@ -102,6 +133,16 @@
         if (looksLikeName(name)) {
           processElement(el);
         }
+      });
+
+    // 3. Scan <a> elements — instructor names on class-schedule.app.utah.edu are
+    //    rendered as hyperlinks (e.g. <a href="...">Smith, Jenn</a>).
+    //    We handle these separately to preserve the element and use preventDefault.
+    root
+      .querySelectorAll(`a:not([${PROCESSED_ATTR}])`)
+      .forEach((el) => {
+        if (el.children.length > 0) return; // skip anchors wrapping icons/images
+        processAnchorElement(el);
       });
   }
 
