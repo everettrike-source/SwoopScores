@@ -22,7 +22,7 @@
 <body>
 
   <h1>Privacy Policy</h1>
-  <p><strong>Last updated:</strong> <!-- TODO: add date --></p>
+  <p><strong>Last updated:</strong> June 2026</p>
   <p>
     SwoopScores ("the Extension") is a Chrome browser extension that displays
     RateMyProfessor scores on the University of Utah class schedule website.
@@ -32,20 +32,12 @@
 
   <h2>Data We Collect</h2>
   <p>
-    <!-- TODO: describe data collected, e.g.:
-         - Professor names read from the class schedule page (not stored)
-         - RateMyProfessor API responses cached locally in chrome.storage.session
-         - No personally identifiable information is collected or transmitted -->
-    [Fill out this section before submitting to the Chrome Web Store.]
+    SwoopScores does not collect, store, or transmit any personally identifiable information (PII) from its users. The Extension only reads the names of professors as they are displayed on the local DOM of the University of Utah class schedule website. 
   </p>
 
   <h2>How We Use Your Data</h2>
   <p>
-    <!-- TODO: describe usage, e.g.:
-         - Professor names are sent to the RateMyProfessor GraphQL API solely
-           to retrieve public rating information.
-         - No data is sold, shared, or used for advertising purposes. -->
-    [Fill out this section before submitting to the Chrome Web Store.]
+    The professor names read from the webpage are used strictly to query the public RateMyProfessor GraphQL API. This allows the Extension to fetch and display the corresponding rating scores next to the professor's name on your screen. <strong>We do not sell, share, or use any user data or browsing history for advertising, tracking, or any other commercial purposes.</strong>
   </p>
 
   <h2>Third-Party Services</h2>
@@ -54,26 +46,22 @@
     <a href="https://www.ratemyprofessors.com" target="_blank" rel="noopener">
       RateMyProfessors
     </a>
-    public GraphQL API. Please review RateMyProfessors'
+    public GraphQL API to retrieve scores. Please review RateMyProfessors'
     <a href="https://www.ratemyprofessors.com/legal/privacy" target="_blank" rel="noopener">
       Privacy Policy
     </a>
-    for information on how they handle data.
+    for information on how they handle queries to their servers.
   </p>
 
   <h2>Data Retention</h2>
   <p>
-    <!-- TODO: e.g., Rating data is cached in chrome.storage.session and is
-         automatically cleared when the browser session ends. No data is
-         persisted beyond the current browsing session. -->
-    [Fill out this section before submitting to the Chrome Web Store.]
+    To improve performance and limit network requests, rating data retrieved from RateMyProfessor is temporarily cached locally on your device using your browser's native session storage (<code>chrome.storage.session</code>). This cache is automatically wiped when your browser session ends. No data is stored on external servers or persisted beyond your current browsing session.
   </p>
 
   <h2>Contact</h2>
   <p>
-    <!-- TODO: add contact email or GitHub issues link -->
-    If you have questions or concerns about this privacy policy, please open an
-    issue at
+    If you have questions or concerns about this privacy policy, or if you wish to review the open-source code for this Extension, please open an issue at our GitHub repository:
+    <br>
     <a href="https://github.com/everettrike-source/SwoopScores/issues" target="_blank" rel="noopener">
       github.com/everettrike-source/SwoopScores
     </a>.
