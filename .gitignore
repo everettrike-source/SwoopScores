@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+
+# Build output
+dist/
+build/
+*.zip
+*.crx
+
+# Environment
+.env
+.env.local

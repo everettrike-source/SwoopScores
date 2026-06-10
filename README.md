@@ -11,10 +11,8 @@ When you browse the schedule, every professor name becomes a clickable link. Cli
 1. Clone or download this repository.
 2. Open Chrome and navigate to `chrome://extensions`.
 3. Enable **Developer mode** (toggle in the top-right corner).
-4. Click **Load unpacked** and select the `SwoopScores` folder.
-5. Navigate to [class-schedule.app.utah.edu](https://class-schedule.app.utah.edu) and click any professor name.
-
-> Icons referenced in `manifest.json` (`icons/icon16.png`, `icons/icon48.png`, `icons/icon128.png`) are optional — Chrome will use a default icon if they are missing. Add your own PNGs at those paths to customize the toolbar button.
+4. Click **Load unpacked** and select the **`chrome/`** subfolder inside the repo (e.g. `D:\SwoopScores\chrome`).
+5. Navigate to [class-schedule.app.utah.edu](https://class-schedule.app.utah.edu) and browse any course listing.
 
 ---
 
@@ -43,14 +41,30 @@ class-schedule.app.utah.edu
 
 ---
 
+## Repository Structure
+
+```
+SwoopScores/
+├── chrome/          ← Load this folder as the unpacked extension
+│   ├── manifest.json
+│   ├── background.js
+│   ├── content.js
+│   └── styles.css
+├── store/           ← Future Chrome Web Store assets (screenshots, icons)
+├── .gitignore
+├── LICENSE
+├── privacy.html     ← Privacy policy stub for Web Store submission
+└── README.md
+```
+
 ## File Overview
 
 | File | Purpose |
 |---|---|
-| `manifest.json` | Extension manifest (MV3) — declares permissions, content scripts, and service worker |
-| `background.js` | Service worker — handles all RMP GraphQL API calls and session caching |
-| `content.js` | Content script — scans the DOM, wraps professor names, renders the popup |
-| `styles.css` | Injected styles — University of Utah crimson theme, popup card, loading/error states |
+| `chrome/manifest.json` | Extension manifest (MV3) — declares permissions, content scripts, and service worker |
+| `chrome/background.js` | Service worker — handles all RMP GraphQL API calls and session caching |
+| `chrome/content.js` | Content script — scans the DOM, inserts star badges, renders the popup |
+| `chrome/styles.css` | Injected styles — University of Utah crimson theme, popup card, badge states |
 
 ---
 
@@ -90,4 +104,4 @@ If the class-schedule site updates its markup and names stop being detected, add
 
 ## License
 
-MIT — feel free to fork and adapt for your own university's registration portal.
+MIT — see [LICENSE](LICENSE). Feel free to fork and adapt for your own university's registration portal.
